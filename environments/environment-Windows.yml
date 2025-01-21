@@ -19,10 +19,8 @@ dependencies:
       - flask-cors === 3.0.10
       - flask_restx == 1.1.0
       - werkzeug < 3.0 # werkzeug 3.0 deprecates features used by flask 2.3.2. Remove this when updating flask.
-      # For stability, NeuroConv is pinned at a commit just prior to breaking SpikeInterface compatibility
-      - neuroconv @ git+https://github.com/catalystneuro/neuroconv.git@fa636458aa5c321f1c2c08f6e682b4a52d5a83f3#neuroconv[dandi,compressors,ecephys,ophys,behavior,text]
-      # For stability, pinning SpikeInterface to a version that works with NeuroConv and with tutorial generation
-      - spikeinterface == 0.100.5
+      - neuroconv[dandi,compressors,ecephys,ophys,behavior,text] == 0.6.6
+      - spikeinterface >= 0.101.2
       - scikit-learn == 1.4.0 # Tutorial data generation
       - tqdm_publisher >= 0.0.1 # Progress bars
       - tzlocal >= 5.2 # Frontend timezone handling

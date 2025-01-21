@@ -1726,12 +1726,19 @@ def generate_test_data(output_path: str):
         io.write(lf_meta_content)
 
     # Make Phy folder
-    waveform_extractor = spikeinterface.extract_waveforms(
-        recording=artificial_ap_band_in_uV, sorting=spiking, mode="memory"
+    sorting_analyzer = spikeinterface.create_sorting_analyzer(
+        recording=artificial_ap_band_in_uV,
+        sorting=spiking,
     )
+    sorting_analyzer.compute(["random_spikes", "waveforms", "templates", "noise_levels"])
+    _ = sorting_analyzer.compute("spike_amplitudes")
+    _ = sorting_analyzer.compute("principal_components", n_components=5, mode="by_channel_local")
 
     export_to_phy(
-        waveform_extractor=waveform_extractor, output_folder=phy_output_folder, remove_if_exists=True, copy_binary=False
+        sorting_analyzer=sorting_analyzer,
+        output_folder=phy_output_folder,
+        remove_if_exists=True,
+        copy_binary=False,
     )
 
 
