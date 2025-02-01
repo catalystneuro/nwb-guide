@@ -1668,11 +1668,13 @@ def generate_test_data(output_path: str):
     """
     Autogenerate the data formats needed for the tutorial pipeline.
 
-    Consists of a single-probe single-segment SpikeGLX recording (both AP and LF bands) as well as Phy spiking data.
+    Consists of a single-probe single-segment SpikeGLX recording (both AP and LF bands) as well as Phy sorting data.
     """
     import spikeinterface
-    from spikeinterface.exporters import export_to_phy
-    from spikeinterface.preprocessing import bandpass_filter, resample, scale
+    import spikeinterface.exporters
+    import spikeinterface.preprocessing
+
+    spikeinterface.set_global_job_kwargs(n_jobs=-1)
 
     base_path = Path(output_path)
     spikeglx_output_folder = base_path / "spikeglx"
@@ -1687,8 +1689,8 @@ def generate_test_data(output_path: str):
     lf_sampling_frequency = 2_500.0
     downsample_factor = int(ap_sampling_frequency / lf_sampling_frequency)
 
-    # Generate synthetic spiking and voltage traces with waveforms around them
-    artificial_ap_band_in_uV, spiking = spikeinterface.generate_ground_truth_recording(
+    # Generate synthetic sorting and voltage traces with waveforms around them
+    artificial_ap_band_in_uV, sorting = spikeinterface.generate_ground_truth_recording(
         durations=[duration_in_s],
         sampling_frequency=ap_sampling_frequency,
         num_channels=number_of_channels,
@@ -1697,12 +1699,18 @@ def generate_test_data(output_path: str):
         seed=0,  # Fixed seed for reproducibility
     )
 
-    unscaled_artificial_ap_band = scale(recording=artificial_ap_band_in_uV, gain=1 / conversion_factor_to_uV)
+    unscaled_artificial_ap_band = spikeinterface.preprocessing.scale(
+        recording=artificial_ap_band_in_uV, gain=1 / conversion_factor_to_uV
+    )
     int16_artificial_ap_band = unscaled_artificial_ap_band.astype(dtype="int16")
     int16_artificial_ap_band.set_channel_gains(conversion_factor_to_uV)
 
-    unscaled_artificial_lf_filter = bandpass_filter(recording=unscaled_artificial_ap_band, freq_min=0.5, freq_max=1_000)
-    unscaled_artificial_lf_band = resample(recording=unscaled_artificial_lf_filter, resample_rate=2_500)
+    unscaled_artificial_lf_filter = spikeinterface.preprocessing.bandpass_filter(
+        recording=unscaled_artificial_ap_band, freq_min=0.5, freq_max=1_000
+    )
+    unscaled_artificial_lf_band = spikeinterface.preprocessing.decimate(
+        recording=unscaled_artificial_lf_filter, decimation_factor=downsample_factor
+    )
     int16_artificial_lf_band = unscaled_artificial_lf_band.astype(dtype="int16")
     int16_artificial_lf_band.set_channel_gains(conversion_factor_to_uV)
 
@@ -1725,13 +1733,16 @@ def generate_test_data(output_path: str):
     with open(file=lf_meta_file_path, mode="w") as io:
         io.write(lf_meta_content)
 
-    # Make Phy folder
-    waveform_extractor = spikeinterface.extract_waveforms(
-        recording=artificial_ap_band_in_uV, sorting=spiking, mode="memory"
+    # Make Phy folder - see https://spikeinterface.readthedocs.io/en/latest/modules/exporters.html
+    sorting_analyzer = spikeinterface.create_sorting_analyzer(
+        sorting=sorting, recording=artificial_ap_band_in_uV, mode="memory", sparse=False
     )
+    sorting_analyzer.compute(["random_spikes", "waveforms", "templates", "noise_levels"])
+    sorting_analyzer.compute("spike_amplitudes")
+    sorting_analyzer.compute("principal_components", n_components=5, mode="by_channel_local")
 
-    export_to_phy(
-        waveform_extractor=waveform_extractor, output_folder=phy_output_folder, remove_if_exists=True, copy_binary=False
+    spikeinterface.exporters.export_to_phy(
+        sorting_analyzer=sorting_analyzer, output_folder=phy_output_folder, remove_if_exists=True, copy_binary=False
     )
 
 
